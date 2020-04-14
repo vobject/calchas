@@ -8,7 +8,7 @@ import threading
 import time
 from typing import Any, Dict, List, Union
 
-import PIL
+from PIL import Image, ImageDraw, ImageFont
 
 from calchas import utils
 from calchas.ui import screen
@@ -36,7 +36,7 @@ from calchas.ui import screen
 #                 if event.key == pygame.K_SPACE:
 #                     menu.mode()
 #
-#     def display(self, img: PIL.Image):
+#     def display(self, img: Image):
 #         img_rgba = img.convert("RGBA")
 #         img_raw = img_rgba.tobytes()
 #         surface = pygame.image.fromstring(img_raw, img_rgba.size, img_rgba.mode)
@@ -66,7 +66,7 @@ if platform.system() == "Linux":
             self.button.when_pressed = menu.next
             self.button2.when_pressed = menu.mode
 
-        def display(self, img: PIL.Image):
+        def display(self, img: Image):
             self.disp.image(img)
             self.disp.display()
 else:
@@ -75,14 +75,14 @@ else:
         def __init__(self, options: Dict[str, Any], menu):
             pass
 
-        def display(self, img: PIL.Image):
+        def display(self, img: Image):
             pass
 
 
 class Menu:
     def __init__(self, options: Dict[str, Any]=None, backend=None):
         self.options = utils.dict_merge(self.default_options(), options)
-        self.font = PIL.ImageFont.load_default()
+        self.font = ImageFont.load_default()
         self.backend = backend or self._select_backend()
         self.menu_screen_idx = 0
         self.menu_screens: List[screen.Base] = []

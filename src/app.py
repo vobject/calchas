@@ -18,11 +18,11 @@ def main():
     try:
         trip_options = {
             "systeminfo": { "active": True },
-            "picamera": { "active": False },
+            "picamera": { "active": True },
             "webcam": { "active": False },
-            "imu": { "active": False },
+            "imu": { "active": True },
             "gps": {
-                "active": False,
+                "active": True,
                 "serial_dev": "COM4" if platform.system() == "Windows" else "/dev/ttyAMA0",
             },
         }

@@ -26,7 +26,7 @@ class SystemInfo(base.MonitoredSensor):
         if not self.dry_run:
             if platform.system() == "Windows":
                 self.impl = SystemInfoWindowsImpl()
-            elif platform.system == "Linux" and os.uname() == "TODO RASPI":
+            elif platform.system() == "Linux" and os.uname()[4][:3] == "arm":  # TODO: identify raspberry pi
                 self.impl = SystemInfoRaspiImpl()
             else:
                 # Generic implementation
