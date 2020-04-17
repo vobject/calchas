@@ -37,11 +37,15 @@ class Sensor(base.Publisher):
             time.sleep(self.options["init_sec"])
             logging.info(f"Camera setup done: {self.impl}")
 
-            self.impl.start_preview()
+            if self.dry_run:
+                self.impl.start_preview()
+                self.impl.preview.alpha = 128
             self.impl.start_recording(self, format=self.options["format"], quality=self.options["quality"])
 
     def _stop_impl(self):
         if self.impl:
+            if self.dry_run:
+                self.impl.stop_preview()
             self.impl.stop_recording()
             self.impl.close()
             self.impl = None

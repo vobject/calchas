@@ -1,4 +1,5 @@
 import datetime
+import json
 import logging
 import os
 import re
@@ -9,6 +10,8 @@ from calchas import utils
 
 
 class Trip:
+    TRIP_OPTIONS_FILE = "trip_options.json"
+
     def __init__(self, parent_dir=".", mode="r", temporary=False, options: Dict[str, Any]=None, max_retries=999):
         self.parent_dir = parent_dir
         self.mode = mode
@@ -22,6 +25,8 @@ class Trip:
         if self.mode in ("r", "a"):
             self.directory = os.path.abspath(self.parent_dir)
             self.parent_dir = os.path.basename(self.directory)
+            with open(os.path.join(self.directory, Trip.TRIP_OPTIONS_FILE), "r") as f:
+                self.options = json.load(f)
             logging.info(f"Trip directory opened: {self.directory}")
         elif self.mode == "w":
             dirs_tried = []
@@ -33,6 +38,8 @@ class Trip:
                     trip_dir = os.path.abspath(os.path.join(self.parent_dir, trip_dir_name))
                     os.makedirs(trip_dir)
                     self.directory = trip_dir
+                    with open(os.path.join(self.directory, Trip.TRIP_OPTIONS_FILE), "w") as f:
+                        json.dump(self.options, f, indent=4)
                     logging.info(f"Trip directory created: {self.directory}")
                     break
                 except FileExistsError:
@@ -144,11 +151,12 @@ class TripManager:
 def main():
     """Test utility for the local classes."""
     logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO)
-    with TripManager.append(".", temporary=True) as trip:
+    with TripManager.read("./20200417T170614Z") as trip:
         print(trip.directory)
+        print(trip.options)
 
-        print("trips: ", TripManager.list())
-    TripManager.cleanup()
+    print("trips: ", TripManager.list())
+    #TripManager.cleanup()
 
 
 if __name__ == "__main__":

@@ -59,7 +59,7 @@ class Sensor(base.Publisher):
             # TODO: create classes for payload-types
             self.publish("all", data)
 
-            time.sleep(1.)
+            time.sleep(.5)
 
 
 class SensorImpl:

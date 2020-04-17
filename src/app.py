@@ -26,7 +26,7 @@ def main():
                 "serial_dev": "COM4" if platform.system() == "Windows" else "/dev/ttyAMA0",
             },
         }
-        with trip.TripManager.new(".", False, trip_options) as new_trip:
+        with trip.TripManager.new(".", True, trip_options) as new_trip:
             with monitor.HealthMonitor(new_trip) as new_monitor:
                 rec = recorder.Recorder(new_trip, new_monitor)
 

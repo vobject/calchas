@@ -34,6 +34,7 @@ class NMEAByteStream:
         line = bytearray()
         while True:
             c = self.stream.read(1)
+            if c == b'\x00': continue
             if not c: break
             line += c
             if line[-2:] == b'\r\n': break
