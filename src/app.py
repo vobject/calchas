@@ -17,16 +17,16 @@ def main():
     logging.info("Starting program")
     try:
         trip_options = {
-            "systeminfo": { "active": True },
-            "picamera": { "active": True },
-            "webcam": { "active": False },
-            "imu": { "active": True },
+            "systeminfo": { "active": True, },
+            "picam": { "active": True, },
+            "webcam": { "active": False, "dry-run": False, },
+            "imu": { "active": True, },
             "gps": {
                 "active": True,
                 "serial_dev": "COM4" if platform.system() == "Windows" else "/dev/ttyAMA0",
             },
         }
-        with trip.TripManager.new(".", True, trip_options) as new_trip:
+        with trip.TripManager.new(".", False, trip_options) as new_trip:
             with monitor.HealthMonitor(new_trip) as new_monitor:
                 rec = recorder.Recorder(new_trip, new_monitor)
 

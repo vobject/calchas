@@ -1,14 +1,14 @@
+import csv
 import datetime
 import logging
 import os
 import threading
 import time
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import pynmea2
 import serial
 
-from calchas import monitor
 from calchas.sensors import base
 
 
@@ -46,38 +46,34 @@ class NMEAByteStreamReader(pynmea2.NMEAStreamReader):
         super().__init__(NMEAByteStream(stream), errors)
 
 
-class Gps(base.MonitoredSensor):
-    def __init__(self, options: Dict[str, Any], healthmon: monitor.HealthMonitor):
-        super().__init__(options, healthmon)
+class Sensor(base.Publisher):
+    def __init__(self, options: Dict[str, Any]):
+        super().__init__(options)
 
-        self.output = None
         self.serial = None
-        self.read_serial_thread = None
+        self.read_thread = None
         self.request_stop = False
 
-    def _start_impl(self):
-        if not self.dry_run and not self.output:
-            logging.info("Setting up GPS output files...")
-            self.output = GpsOutput(self.out_dir)
-            logging.info(f"GPS output files done: {self.output}")
+    def offer(self) -> List[str]:
+        # TODO: support topics, e.g. NMEA message types
+        return ["all"]
 
-        if not self.dry_run and not self.serial:
+    def _start_impl(self):
+        if not self.serial:
             self.serial = serial.Serial(self.options["serial_dev"], baudrate=self.options["serial_baudrate"], timeout=self.options["serial_timeout"])
 
-        if not self.dry_run and not self.read_serial_thread:
+        self.request_stop = False
+        if not self.read_thread:
             logging.info("Starting GPS thread...")
-            self.read_serial_thread = threading.Thread(target=self._read_thread_fn)
-            self.read_serial_thread.start()
+            self.read_thread = threading.Thread(target=self._read_thread_fn)
+            self.read_thread.start()
             logging.info(f"GPS thread started.")
 
     def _stop_impl(self):
         self.request_stop = True
-        if self.read_serial_thread:
-            self.read_serial_thread.join()
-            self.read_serial_thread = None
-        if self.output:
-            self.output.close()
-            self.output = None
+        if self.read_thread:
+            self.read_thread.join()
+            self.read_thread = None
 
     def _read_thread_fn(self):
         if self.request_stop:
@@ -89,72 +85,52 @@ class Gps(base.MonitoredSensor):
 
             for msg in batch:
                 if isinstance(msg, pynmea2.GGA):
-                    self.monitor(msg)
-                    self.output.write(msg)
+                    # TODO: create classes for payload-types
+                    self.publish("all", msg)
 
             if self.request_stop:
                 return
 
 
-class GpsOutput():
-    def __init__(self, out_dir: str, fname="gps.csv", write_threshold: int=100):
-        super().__init__()
+class Output(base.Subscriber):
+    def __init__(self, options: Dict[str, Any]):
+        super().__init__(options)
 
-        self.fpath = os.path.join(out_dir, fname)
-        self.fd = open(self.fpath, "w")
-        self.fd.write(r"""<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2">
-<Document>
-<Style id="yellowPoly">
-<LineStyle>
-<color>7f00ffff</color>
-<width>4</width>
-</LineStyle>
-<PolyStyle>
-<color>7f00ff00</color>
-</PolyStyle>
-</Style>
-<Placemark><styleUrl>#yellowPoly</styleUrl>
-<LineString>
-<extrude>1</extrude>
-<tesselate>1</tesselate>
-<altitudeMode>absolute</altitudeMode>
-<coordinates>""")
-        self.request_stop = False
+        self.fpath = os.path.join(self.out_dir, self.options["output"])
+        self.fd = None
+        self.header_written = False
+        self.data = []
 
-        self.gps_positions = []
-        self.gps_positions_threshold = write_threshold
+    def _start_impl(self):
+        self.fd = open(self.fpath, "w", newline="")
+        self.header_written = False
+        self.data = []
 
-    def __repr__(self):
-        return f"gps_positions_cache={len(self.gps_positions)}/{self.gps_positions_threshold} path={self.fpath}"
-
-    def __str__(self):
-        return self.__repr__()
-
-    def write(self, msg):
-        if self.request_stop:
-            return
-
-        self.gps_positions.append(f"{msg.longitude},{msg.latitude},{msg.altitude}")
-
-        # Write gps data to disk every 100 entries
-        if len(self.gps_positions) % self.gps_positions_threshold == 0:
-            self.flush()
-
-    def flush(self):
-        if self.fd:
-            self.fd.write(" ".join(self.gps_positions))
-        self.gps_positions.clear()
-        logging.info("GPS output flushed")
-
-    def close(self):
-        self.request_stop = True
-
+    def _stop_impl(self):
         self.flush()
 
         if self.fd:
-            self.fd.write(r"""</coordinates>
-</LineString></Placemark>
-</Document></kml>""")
             self.fd.close()
             self.fd = None
+
+    def on_process_message(self, msg: base.Message):
+        self.data.append([
+            msg.timestamp,
+            msg.data.longitude,
+            msg.data.latitude,
+            msg.data.altitude,
+        ])
+
+        # Write data to disk every X entries
+        if len(self.data) % self.options["output_write_threshold"] == 0:
+            self.flush()
+
+    def flush(self):
+        if self.fd and (self.data or not self.header_written):
+            writer = csv.writer(self.fd)
+            if not self.header_written:
+                writer.writerow(["timestamp", "longitude", "latitude", "altitude"])
+                self.header_written = True
+            writer.writerows(self.data)
+        self.data.clear()
+        logging.info("GPS output flushed")

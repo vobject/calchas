@@ -101,7 +101,7 @@ class Menu:
                 "systeminfo": {
                     "header": "SYSTEM",
                 },
-                "picamera": {
+                "picam": {
                     "header": "PICAMERA",
                 },
                 "webcam": {
@@ -142,7 +142,7 @@ class Menu:
 
     def display(self):
         if self.backend and self.menu_screens:
-            self.backend.display(self.menu_screens[self.menu_screen_idx].frame())
+            self.backend.display(self.menu_screens[self.menu_screen_idx].frame().rotate(180))
 
     def exit(self):
         if self.backend and self.menu_screens:
@@ -162,10 +162,10 @@ class Menu:
         screen_options = utils.dict_merge(screen_options, options)
         if name == "systeminfo":
             return screen.SystemInfo(screen_options)
-        elif name == "picamera":
+        elif name == "picam":
             return screen.PiCamera(screen_options)
-        elif name == "webcam":
-            return screen.Webcam(screen_options)
+        #elif name == "webcam":
+        #    return screen.Webcam(screen_options)
         elif name == "imu":
             return screen.Imu(screen_options)
         elif name == "gps":

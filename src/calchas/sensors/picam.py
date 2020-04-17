@@ -5,106 +5,107 @@ import logging
 import os
 import threading
 import time
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import picamera
 import PIL
 
-from calchas import monitor
 from calchas.sensors import base
 
 
-class PiCamera(base.MonitoredSensor):
-    def __init__(self, options: Dict[str, Any], healthmon: monitor.HealthMonitor):
-        super().__init__(options, healthmon)
+class Sensor(base.Publisher):
+    def __init__(self, options: Dict[str, Any]):
+        super().__init__(options)
 
-        self.output = None
-        self.camera = None
+        self.impl = None
 
         # TODO: rework preview logic/handling and in stop()
         self.lastpreviewimg = time.time()
         self.previewimage = None
 
+    def offer(self) -> List[str]:
+        # TODO: support topics
+        return ["all"]
+
     def _start_impl(self):
-        if not self.dry_run and not self.output:
-            logging.info("Setting up camera output files...")
-            self.output = CameraOutput(self.out_dir)
-            logging.info(f"Camera output files done: {self.output}")
-
-        if not self.camera:
+        if not self.impl:
             logging.info("Setting up camera...")
-            try:
-                self.camera = picamera.PiCamera()
-            except picamera.exc.PiCameraError as ex:
-                logging.error(f"Failed to set up camera. Error: {ex}")
-                # TODO: report to monitoring
-                self.stop()
-                return
-            self.camera.resolution = (self.options["width"], self.options["height"])
-            self.camera.framerate = self.options["framerate"]
-            self.camera.rotation = self.options["rotation"]
+            self.impl = picamera.PiCamera()
+            self.impl.resolution = (self.options["width"], self.options["height"])
+            self.impl.framerate = self.options["framerate"]
+            self.impl.rotation = self.options["rotation"]
             time.sleep(self.options["init_sec"])
-            logging.info(f"Camera setup done: {self.camera}")
+            logging.info(f"Camera setup done: {self.impl}")
 
-            self.camera.start_preview()
-            self.camera.start_recording(self, format=self.options["format"], quality=self.options["quality"])
+            self.impl.start_preview()
+            self.impl.start_recording(self, format=self.options["format"], quality=self.options["quality"])
 
     def _stop_impl(self):
-        if self.camera:
-            self.camera.stop_recording()
-            self.camera.close()
-            self.camera = None
-        if self.output:
-            self.output.close()
-            self.output = None
+        if self.impl:
+            self.impl.stop_recording()
+            self.impl.close()
+            self.impl = None
 
     def write(self, image):
         current_time = time.time()
         if current_time - self.lastpreviewimg >= .5:
             stream = io.BytesIO()
-            self.camera.capture(stream, use_video_port=True, format="jpeg", resize=(320,200))
+            self.impl.capture(stream, use_video_port=True, format="jpeg", resize=(320,200))
             stream.seek(0)
             self.previewimage = PIL.Image.open(stream)
             self.lastpreviewimg = current_time
 
-        self.monitor({"frame":self.camera.frame, "image":image, "preview":self.previewimage})
-        self.output.write(self.camera.frame, image)
+        data = {
+            "frame": self.impl.frame,
+            "image": image,
+            "preview": self.previewimage,
+        }
 
-    def flush(self):
-        pass
+        # TODO: create classes for payload-types
+        self.publish("all", data)
 
 
-class CameraOutput:
-    def __init__(self, out_dir: str, data_name="picamera.h264", metadata_name="picamera.csv", metadata_threshold: int=100):
-        super().__init__()
+class Output(base.Subscriber):
+    def __init__(self, options: Dict[str, Any]):
+        super().__init__(options)
 
-        self.data_path = os.path.join(out_dir, data_name)
-        self.metadata_path = os.path.join(out_dir, metadata_name)
+        self.data_path = os.path.join(self.out_dir, self.options["output_data"])
+        self.metadata_path = os.path.join(self.out_dir, self.options["output_metadata"])
 
-        self.data_fd = open(self.data_path, "wb")
-        self.metadata_fd = open(self.metadata_path, "w")
-        self.request_stop = False
+        self.data_fd = None
+        self.metadata_fd = None
 
         self.frame_cnt = 0
         self.incomplete_frames = []
         self.metadata_header_written = False
         self.metadata = []
-        self.metadata_threshold = metadata_threshold
 
-    def __repr__(self):
-        return f"frames={self.frame_cnt} metadata_cache={len(self.metadata)}/{self.metadata_threshold} data={self.data_path} metadata={self.metadata_path}"
+    def _start_impl(self):
+        self.data_fd = open(self.data_path, "wb")
+        self.metadata_fd = open(self.metadata_path, "w")
 
-    def __str__(self):
-        return self.__repr__()
+        self.frame_cnt = 0
+        self.incomplete_frames = []
+        self.metadata_header_written = False
+        self.metadata = []
 
-    def write(self, frame, image):
-        if self.request_stop:
-            return
+    def _stop_impl(self):
+        self.flush()
 
-        timestamp = int(time.time() * 1000)
+        if self.data_fd:
+            self.data_fd.close()
+            self.data_fd = None
 
+        if self.metadata_fd:
+            self.metadata_fd.close()
+            self.metadata_fd = None
+
+    def on_process_message(self, msg: base.Message):
         # Always write data
-        self.data_fd.write(image)
+        self.data_fd.write(msg.data["image"])
+
+        timestamp = msg.timestamp
+        frame = msg.data["frame"]
 
         if frame.complete is False:
             self.incomplete_frames.append((timestamp, frame))
@@ -123,20 +124,16 @@ class CameraOutput:
 
             self.incomplete_frames.clear()
 
-        #logging.debug(f"frame {frame} ts={timestamp}")
-
-        self.metadata.append(
-            [
-                timestamp,
-                self.frame_cnt - 1,
-                frame.frame_type,
-                frame_size,
-                frame.video_size,
-            ]
-        )
+        self.metadata.append([
+            timestamp,
+            self.frame_cnt - 1,
+            frame.frame_type,
+            frame_size,
+            frame.video_size,
+        ])
 
         # Write meta data to disk every X entries
-        if len(self.metadata) % self.metadata_threshold == 0:
+        if len(self.metadata) % self.options["output_metadata_threshold"] == 0:
             self.flush()
 
     def flush(self):
@@ -148,16 +145,3 @@ class CameraOutput:
             writer.writerows(self.metadata)
         self.metadata.clear()
         logging.info("PiCamera metadata output flushed")
-
-    def close(self):
-        self.request_stop = True
-
-        self.flush()
-
-        if self.data_fd:
-            self.data_fd.close()
-            self.data_fd = None
-
-        if self.metadata_fd:
-            self.metadata_fd.close()
-            self.metadata_fd = None

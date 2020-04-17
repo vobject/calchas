@@ -6,38 +6,36 @@ import platform
 import subprocess
 import threading
 import time
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import psutil
 
-from calchas import monitor
 from calchas.sensors import base
 
 
-class SystemInfo(base.MonitoredSensor):
-    def __init__(self, options: Dict[str, Any], healthmon: monitor.HealthMonitor):
-        super().__init__(options, healthmon)
+class Sensor(base.Publisher):
+    def __init__(self, options: Dict[str, Any]):
+        super().__init__(options)
 
         self.impl = None
-        self.output = None
         self.read_thread = None
         self.request_stop = False
 
-        if not self.dry_run:
-            if platform.system() == "Windows":
-                self.impl = SystemInfoWindowsImpl()
-            elif platform.system() == "Linux" and os.uname()[4][:3] == "arm":  # TODO: identify raspberry pi
-                self.impl = SystemInfoRaspiImpl()
-            else:
-                # Generic implementation
-                self.impl = SystemInfoImpl()
+    def offer(self) -> List[str]:
+        # TODO: support topics
+        return ["all"]
 
     def _start_impl(self):
-        if not self.dry_run and not self.output:
-            logging.info("Setting up system info output files...")
-            self.output = SystemInfoOutput(self.out_dir)
-            logging.info(f"System info output files done: {self.output}")
+        if not self.impl:
+            if platform.system() == "Windows":
+                self.impl = SensorImplWindows()
+            elif platform.system() == "Linux" and os.uname()[4][:3] == "arm":  # TODO: identify raspberry pi
+                self.impl = SensorImplRaspi()
+            else:
+                # Generic implementation
+                self.impl = SensorImpl()
 
+        self.request_stop = False
         if not self.read_thread:
             logging.info("Starting system info thread...")
             self.read_thread = threading.Thread(target=self._read_thread_fn)
@@ -49,28 +47,22 @@ class SystemInfo(base.MonitoredSensor):
         if self.read_thread:
             self.read_thread.join()
             self.read_thread = None
-        if self.output:
-            self.output.close()
-            self.output = None
 
     def _read_thread_fn(self):
         while not self.request_stop:
-            sysinfo = {
-                "timestamp": int(time.time() * 1000),
-                "filesystem": {} if self.dry_run else self.impl.read_fs(),
-                "process": {} if self.dry_run else self.impl.read_process(),
-                "temperature": {} if self.dry_run else self.impl.read_temp(),
+            data = {
+                "filesystem": self.impl.read_fs(),
+                "process": self.impl.read_process(),
+                "temperature": self.impl.read_temp(),
             }
 
-            self.monitor(sysinfo)
+            # TODO: create classes for payload-types
+            self.publish("all", data)
 
-            if self.output:
-                self.output.write(sysinfo)
-
-            time.sleep(.9)
+            time.sleep(1.)
 
 
-class SystemInfoImpl:
+class SensorImpl:
     def __init__(self):
         self.process = psutil.Process(os.getpid())
 
@@ -101,11 +93,11 @@ class SystemInfoImpl:
         return {}
 
 
-class SystemInfoWindowsImpl(SystemInfoImpl):
+class SensorImplWindows(SensorImpl):
     pass
 
 
-class SystemInfoRaspiImpl(SystemInfoImpl):
+class SensorImplRaspi(SensorImpl):
     def read_temp(self) -> Dict[str, Any]:
         def get_cpu_temp():
             return float(subprocess.check_output("vcgencmd measure_temp", shell=True).decode("utf-8").split("=")[1].split("\'")[0])
@@ -120,46 +112,44 @@ class SystemInfoRaspiImpl(SystemInfoImpl):
         }
 
 
-class SystemInfoOutput():
-    def __init__(self, out_dir: str, fname="systeminfo.csv", write_threshold: int=10):
-        super().__init__()
+class Output(base.Subscriber):
+    def __init__(self, options: Dict[str, Any]):
+        super().__init__(options)
 
-        self.fpath = os.path.join(out_dir, fname)
-        self.fd = open(self.fpath, "w", newline="")
-        self.request_stop = False
-
+        self.fpath = os.path.join(self.out_dir, self.options["output"])
+        self.fd = None
         self.header_written = False
         self.data = []
-        self.data_threshold = write_threshold
 
-    def __repr__(self):
-        return f"sysinfo_cache={len(self.data)}/{self.data_threshold} path={self.fpath}"
+    def _start_impl(self):
+        self.fd = open(self.fpath, "w", newline="")
+        self.header_written = False
+        self.data = []
 
-    def __str__(self):
-        return self.__repr__()
+    def _stop_impl(self):
+        self.flush()
 
-    def write(self, data: Dict[str, Any]):
-        if self.request_stop:
-            return
+        if self.fd:
+            self.fd.close()
+            self.fd = None
 
-        self.data.append(
-            [
-                data["timestamp"],
-                data["process"]["cpu_percent"],
-                data["process"]["mem_rss"],
-                data["process"]["mem_vms"],
-                #data["filesystem"]["/"]["percent"],
-                #data["temperature"]["cpu"],
-                #data["temperature"]["gpu"],
-            ]
-        )
+    def on_process_message(self, msg: base.Message):
+        self.data.append([
+            msg.timestamp,
+            msg.data["process"]["cpu_percent"],
+            msg.data["process"]["mem_rss"],
+            msg.data["process"]["mem_vms"],
+            msg.data["filesystem"]["/"]["percent"],
+            msg.data["temperature"]["cpu"],
+            msg.data["temperature"]["gpu"],
+        ])
 
-        # Write gps data to disk every X entries
-        if len(self.data) % self.data_threshold == 0:
+        # Write data to disk every X entries
+        if len(self.data) % self.options["output_write_threshold"] == 0:
             self.flush()
 
     def flush(self):
-        if self.fd:
+        if self.fd and (self.data or not self.header_written):
             writer = csv.writer(self.fd)
             if not self.header_written:
                 writer.writerow(["timestamp", "process_cpu", "process_rss", "process_vms", "disk_used", "temp_cpu", "temp_gpu"])
@@ -167,12 +157,3 @@ class SystemInfoOutput():
             writer.writerows(self.data)
         self.data.clear()
         logging.info("System info output flushed")
-
-    def close(self):
-        self.request_stop = True
-
-        self.flush()
-
-        if self.fd:
-            self.fd.close()
-            self.fd = None

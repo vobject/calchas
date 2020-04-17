@@ -1,8 +1,10 @@
+import importlib
 import logging
 import time
-from typing import Any, Dict
+from typing import Any, Dict, List, Tuple
 
 from calchas import monitor, trip, utils
+from calchas.sensors import base
 
 
 class Recorder:
@@ -11,7 +13,7 @@ class Recorder:
 
         self.trip = trip
         self.healthmon = healthmon
-        self.sensors = []
+        self.sensors: List[Tuple[base.Publisher, base.Subscriber]] = []
         self.running = False
 
     def start(self):
@@ -36,35 +38,28 @@ class Recorder:
         for name, options in self.trip.options.items():
             if options["active"]:
                 self.sensors.append(self._create_sensor_instance(name, options))
-        for sensor in self.sensors:
-            logging.info(f"Starting {sensor.name}...")
-            sensor.start()
-            logging.info(f"{sensor.name} started.")
+        for pub, sub in self.sensors:
+            logging.info(f"Starting {pub.name}...")
+            if sub:
+                pub.subscribe(sub)
+                sub.start()
+            pub.start()
+            logging.info(f"{pub.name} started.")
 
     def _stop_sensors(self):
-        for sensor in reversed(self.sensors):
-            logging.info(f"Stopping {sensor.name}...")
-            sensor.stop()
-            logging.info(f"{sensor.name} stopped.")
+        for pub, sub in reversed(self.sensors):
+            logging.info(f"Stopping {pub.name}...")
+            pub.stop()
+            if sub:
+                pub.unsubscribe(sub)
+                sub.stop()
+            logging.info(f"{pub.name} stopped.")
         self.sensors = []
 
-    def _create_sensor_instance(self, name: str, options: Dict[str, Any]):
-        options = utils.dict_merge(options.copy(), { "out_dir": self.trip.directory })
+    def _create_sensor_instance(self, name: str, options: Dict[str, Any]) -> Tuple[base.Publisher, base.Subscriber]:
         logging.info(f"Loading {name}...")
-        if name == "systeminfo":
-            from calchas.sensors import systeminfo
-            return systeminfo.SystemInfo(options, self.healthmon)
-        elif name == "picamera":
-            from calchas.sensors import picam
-            return picam.PiCamera(options, self.healthmon)
-        elif name == "webcam":
-            from calchas.sensors import webcam
-            return webcam.Webcam(options, self.healthmon)
-        elif name == "imu":
-            from calchas.sensors import imu
-            return imu.Imu(options, self.healthmon)
-        elif name == "gps":
-            from calchas.sensors import gps
-            return gps.Gps(options, self.healthmon)
-        else:
-            raise ValueError(f"Unknown sensor {name}")
+        options = utils.dict_merge(options.copy(), { "out_dir": self.trip.directory })
+        module = importlib.import_module(f"calchas.sensors.{name}")
+        pub = module.Sensor(options)
+        sub = module.Output(options) if options.get("dry-run", False) is False else None
+        return pub, sub
