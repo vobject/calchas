@@ -89,7 +89,7 @@ class Output(base.Subscriber):
     def _start_impl(self):
         fourcc = cv2.VideoWriter_fourcc(*self.options["format"])
         self.data_writer = cv2.VideoWriter(self.data_path, fourcc, self.options["framerate"], (self.options["width"], self.options["height"]))
-        self.metadata_fd = open(self.metadata_path, "w")
+        self.metadata_fd = open(self.metadata_path, "w", newline="")
 
         self.frame_cnt = 0
         self.metadata_header_written = False

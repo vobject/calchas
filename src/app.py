@@ -19,7 +19,7 @@ def main():
         trip_options = {
             "systeminfo": { "active": True, },
             "picam": { "active": True, },
-            "webcam": { "active": False, "dry-run": False, },
+            "webcam": { "active": False, "dry-run": False, "device": 0, "format": "mp4v", "width": 640, "height": 480, },
             "imu": { "active": True, },
             "gps": {
                 "active": True,
@@ -28,10 +28,8 @@ def main():
         }
         with trip.TripManager.new(".", False, trip_options) as new_trip:
             with monitor.HealthMonitor(new_trip) as new_monitor:
+                # with vis.Visualization(new_trip, new_monitor) as ui:
                 rec = recorder.Recorder(new_trip, new_monitor)
-
-                new_monitor.register_shutdown_callback(lambda: rec.stop())
-
                 rec.start()
                 while rec.running:
                     time.sleep(1.)

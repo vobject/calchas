@@ -7,50 +7,6 @@ from typing import Any, Dict, List
 from calchas import monitor
 
 
-class MonitoredSensor:
-    def __init__(self, options: Any, healthmon: monitor.HealthMonitor):
-        super().__init__()
-        self._options = options
-        self._healthmon = healthmon
-
-    @property
-    def name(self):
-        return self.options["name"]
-
-    @property
-    def options(self):
-        return self._options
-
-    @property
-    def dry_run(self):
-        return self.options.get("dry-run", False)
-
-    @property
-    def out_dir(self):
-        return self.options["out_dir"]
-
-    def monitor(self, entry: Any):
-        self._healthmon.on_report(monitor.HealthEntry(self, entry))
-
-    def start(self):
-        try:
-            self._start_impl()
-        except Exception:
-            logging.exception(f"Error starting {self.name}")
-
-    def stop(self):
-        try:
-            self._stop_impl()
-        except Exception:
-            logging.exception(f"Error stopping {self.name}")
-
-    def _start_impl(self):
-        raise NotImplementedError
-
-    def _stop_impl(self):
-        raise NotImplementedError
-
-
 class SensorBase:
     def __init__(self, options: Any):
         self._options = options
@@ -104,10 +60,6 @@ class Subscriber:
     def out_dir(self) -> str:
         return self.options["out_dir"]
 
-    #@property
-    #def request_stop(self) -> bool:
-    #    raise NotImplementedError
-
     def on_process_message(self, msg: Message) -> None:
         raise NotImplementedError
 
@@ -115,7 +67,7 @@ class Subscriber:
         if self._run_message_thread:
             self._messages.put(msg)
 
-    def start(self):
+    def start(self) -> None:
         try:
             self._start_impl()
 
@@ -128,7 +80,7 @@ class Subscriber:
         except Exception:
             logging.exception(f"Error starting {self.name}")
 
-    def stop(self):
+    def stop(self) -> None:
         try:
             self._run_message_thread = False
             if self._message_thread:
@@ -142,12 +94,11 @@ class Subscriber:
         except Exception:
             logging.exception(f"Error stopping {self.name}")
 
-    def _start_impl(self):
+    def _start_impl(self) -> None:
         raise NotImplementedError
 
-    def _stop_impl(self):
+    def _stop_impl(self) -> None:
         raise NotImplementedError
-
 
     def _consume_message_thread_fn(self) -> None:
         while self._run_message_thread:
@@ -163,39 +114,43 @@ class Publisher(SensorBase):
     def __init__(self, options: Any):
         super().__init__(options)
         self._subscribers: Dict[str, List[Subscriber]] = {}
+        self._subscribers_lock = threading.RLock()
 
     def offer(self) -> List[str]:
         # Offered sensors may not change during lifetime of object.
         raise NotImplementedError
 
-    def subscribe(self, subscriber: Subscriber, topic: str=None):
-        if topic:
-            subs = self._subscribers.get(topic, [])
-            if not subscriber in subs:
-                subs.append(subscriber)
-                self._subscribers[topic] = subs
-        else:
-            # Subscribe to all topics
-            for t in self.offer():
-                self.subscribe(subscriber, t)
+    def subscribe(self, subscriber: Subscriber, topic: str=None) -> None:
+        with self._subscribers_lock:
+            if topic:
+                subs = self._subscribers.get(topic, [])
+                if not subscriber in subs:
+                    subs.append(subscriber)
+                    self._subscribers[topic] = subs
+            else:
+                # Subscribe to all topics
+                for t in self.offer():
+                    self.subscribe(subscriber, t)
 
-    def unsubscribe(self, subscriber: Subscriber, topic: str=None):
-        if topic:
-            for t, subs in self._subscribers.items():
-                if t == topic and subscriber in subs:
-                    subs.remove(subscriber)
-        else:
-            # Unsubscribe from all topics
-            for t in self.offer():
-                self.unsubscribe(subscriber, t)
+    def unsubscribe(self, subscriber: Subscriber, topic: str=None) -> None:
+        with self._subscribers_lock:
+            if topic:
+                for t, subs in self._subscribers.items():
+                    if t == topic and subscriber in subs:
+                        subs.remove(subscriber)
+            else:
+                # Unsubscribe from all topics
+                for t in self.offer():
+                    self.unsubscribe(subscriber, t)
 
     def publish(self, topic: str, payload: Any) -> None:
-        for t, subs in self._subscribers.items():
-            if t == topic:
-                for s in subs:
-                    s.on_message(Message(self, topic, payload))
+        with self._subscribers_lock:
+            for t, subs in self._subscribers.items():
+                if t == topic:
+                    for s in subs:
+                        s.on_message(Message(self, topic, payload))
 
-    def start(self):
+    def start(self) -> None:
         try:
             self._start_impl()
         except NotImplementedError:
@@ -203,7 +158,7 @@ class Publisher(SensorBase):
         except Exception:
             logging.exception(f"Error starting {self.name}")
 
-    def stop(self):
+    def stop(self) -> None:
         try:
             self._stop_impl()
         except NotImplementedError:
@@ -211,8 +166,8 @@ class Publisher(SensorBase):
         except Exception:
             logging.exception(f"Error stopping {self.name}")
 
-    def _start_impl(self):
+    def _start_impl(self) -> None:
         raise NotImplementedError
 
-    def _stop_impl(self):
+    def _stop_impl(self) -> None:
         raise NotImplementedError

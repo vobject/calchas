@@ -53,6 +53,7 @@ class Sensor(base.Publisher):
             return math.sqrt((a * a) + (b * b))
 
         address = self.options["address"]
+        frequency_sleep_sec = 1. / self.options.get("frequency", 1.)
         while not self.request_stop:
             gyro_x = read_word(self.impl, address, 0x43) / 131.
             gyro_y = read_word(self.impl, address, 0x45) / 131.
@@ -79,7 +80,7 @@ class Sensor(base.Publisher):
             # TODO: create classes for payload-types
             self.publish("all", data)
 
-            time.sleep(0.1)
+            time.sleep(frequency_sleep_sec - time.time() % frequency_sleep_sec)
 
 
 class Output(base.Subscriber):

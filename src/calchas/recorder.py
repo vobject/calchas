@@ -16,6 +16,8 @@ class Recorder:
         self.sensors: List[Tuple[base.Publisher, base.Subscriber]] = []
         self.running = False
 
+        self.healthmon.register_shutdown_callback(self.stop)
+
     def start(self):
         if self.running:
             logging.warning("Trying to start a recorder that is already running")
@@ -40,6 +42,7 @@ class Recorder:
                 self.sensors.append(self._create_sensor_instance(name, options))
         for pub, sub in self.sensors:
             logging.info(f"Starting {pub.name}...")
+            pub.subscribe(self.healthmon)
             if sub:
                 pub.subscribe(sub)
                 sub.start()
@@ -53,6 +56,7 @@ class Recorder:
             if sub:
                 pub.unsubscribe(sub)
                 sub.stop()
+            pub.subscribe(self.healthmon)
             logging.info(f"{pub.name} stopped.")
         self.sensors = []
 

@@ -8,7 +8,7 @@ import time
 from typing import Any, Dict, List
 
 import picamera
-import PIL
+from PIL import Image
 
 from calchas.sensors import base
 
@@ -56,7 +56,7 @@ class Sensor(base.Publisher):
             stream = io.BytesIO()
             self.impl.capture(stream, use_video_port=True, format="jpeg", resize=(320,200))
             stream.seek(0)
-            self.previewimage = PIL.Image.open(stream)
+            self.previewimage = Image.open(stream)
             self.lastpreviewimg = current_time
 
         data = {
