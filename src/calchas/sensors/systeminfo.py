@@ -119,7 +119,7 @@ class SensorImplRaspi(SensorImpl):
             return float(subprocess.check_output("vcgencmd measure_temp", shell=True).decode("utf-8").split("=")[1].split("\'")[0])
 
         state = super().read_system()
-        state["cpu_temp"] = get_cpu_temp()
+        state["system_cpu_temp"] = get_cpu_temp()
         return state
 
 
