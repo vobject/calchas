@@ -30,7 +30,7 @@ class SensorBase:
 
 class Message:
     def __init__(self, sensor: SensorBase, topic: str, data: Any):
-        self.timestamp = int(time.time() * 1000)
+        self.timestamp = time.time()
         self.sensor = sensor
         self.topic = topic
         self.data = data

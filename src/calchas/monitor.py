@@ -12,7 +12,7 @@ from typing import Any, Dict
 
 from calchas import trip, utils
 from calchas.sensors import base as sensorbase
-#from calchas.ui import menu
+from calchas.ui import menu
 
 
 class HealthEntry:
@@ -32,15 +32,12 @@ class HealthMonitor(sensorbase.Subscriber):
     def __init__(self, trip: trip.Trip, options: Dict[str, Any]=None):
         super().__init__(utils.dict_merge(self.default_options(), options))
         self.trip = trip
-        #self.options = utils.dict_merge(self.default_options(), options)
         self.request_stop = False
 
-#        self._entries = queue.Queue()
-#        self._consume_entries_thread = None
         self._health_check_thread = None
         self._shutdown_callbacks = []
 
-        # self.menu = None
+        self.menu = None
 
     def __enter__(self):
         self._run_health_check()
@@ -48,10 +45,10 @@ class HealthMonitor(sensorbase.Subscriber):
             raise OSError("Failed to start health monitor because initial health check failed.")
 
         # TODO: find a better place for this...
-        # self.menu = menu.Menu()
-        # for sensor_name, sensor_options in self.trip.options.items():
-        #     if sensor_options.get("active", False):
-        #         self.menu.add_screen(sensor_name)
+        self.menu = menu.Menu()
+        for sensor_name, sensor_options in self.trip.options.items():
+            if sensor_options.get("active", False):
+                self.menu.add_screen(sensor_name)
 
         self.start()
 
@@ -62,7 +59,7 @@ class HealthMonitor(sensorbase.Subscriber):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.stop()
 
-        # self.menu.exit()
+        self.menu.exit()
 
         signal.signal(signal.SIGINT, self._orig_handler_sigint)
         signal.signal(signal.SIGTERM, self._orig_handler_sigterm)
@@ -80,6 +77,8 @@ class HealthMonitor(sensorbase.Subscriber):
 
     def on_process_message(self, msg: sensorbase.Message):
         logging.debug(f"Monitor msg from {msg.sensor.name}")
+
+        self.menu.update(msg)
 
         if msg.sensor.name == "systeminfo":
            logging.info(pprint.pformat(msg.data, indent=4))
@@ -120,7 +119,7 @@ class HealthMonitor(sensorbase.Subscriber):
                     cb()
                 break
 
-            # self.menu.display()
+            self.menu.display()
             time.sleep(frequency_sleep_sec - time.time() % frequency_sleep_sec)
 
     def _run_health_check(self):

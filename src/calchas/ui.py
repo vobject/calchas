@@ -185,7 +185,7 @@ class FakeSystemInfoModel:
         process = psutil.Process(os.getpid())
         meminfo = process.memory_info()
         return {
-            "timestamp": int(time.time() * 1000),
+            "timestamp": time.time(),
             "filesystem": {
                 part.mountpoint: {
                     "total": psutil.disk_usage(part.mountpoint)[0],

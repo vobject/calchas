@@ -34,6 +34,11 @@ class Sensor(base.Publisher):
             self.impl.resolution = (self.options["width"], self.options["height"])
             self.impl.framerate = self.options["framerate"]
             self.impl.rotation = self.options["rotation"]
+
+            # Turn off camera LED; only works when running as root.
+            # Alternatively, set 'disable_camera_led=1' in /boot/config.txt.
+            self.impl.led = False
+
             time.sleep(self.options["init_sec"])
             logging.info(f"Camera setup done: {self.impl}")
 

@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Union
 from PIL import Image, ImageDraw, ImageFont
 
 from calchas import utils
+from calchas.sensors import base as sensorbase
 from calchas.ui import screen
 
 
@@ -45,21 +46,16 @@ from calchas.ui import screen
 
 
 if platform.system() == "Linux":
-    import sys
-    sys.path.append("/home/pi/calchas2/Adafruit_Python_PureIO")
-    sys.path.append("/home/pi/calchas2/Adafruit_Python_GPIO")
-    sys.path.append("/home/pi/calchas2/Adafruit_Python_SSD1306")
-    import Adafruit_SSD1306
     import gpiozero
+    from luma.core.interface import serial
+    from luma.oled import device
 
     class _Oled:
         def __init__(self, options: Dict[str, Any], menu):
             self.options = options
 
-            self.disp = Adafruit_SSD1306.SSD1306_128_64(rst=None)
-            self.disp.begin()
-            self.disp.clear()
-            self.disp.display()
+            self.bus = serial.i2c(port=self.options["port"], address=self.options["address"])
+            self.disp = device.ssd1306(self.bus, rotate=self.options["rotation"])
 
             self.button = gpiozero.Button(17)
             self.button2 = gpiozero.Button(18)
@@ -67,10 +63,9 @@ if platform.system() == "Linux":
             self.button2.when_pressed = menu.mode
 
         def display(self, img: Image):
-            self.disp.image(img)
-            self.disp.display()
+            self.disp.display(img)
 else:
-    # TODO: protable backend or better fallback
+    # TODO: portable backend or better fallback
     class _Oled:
         def __init__(self, options: Dict[str, Any], menu):
             pass
@@ -94,6 +89,9 @@ class Menu:
                 "type": "SDD1306",
                 "active": False,
                 "dry-run": False,
+                "port": 1,
+                "address": 0x3c,
+                "rotation": 2,  # 0==0°, 1==90°, 2==180°, 3==270° clockwise
                 "width": 128,
                 "height": 64,
             },
@@ -133,20 +131,21 @@ class Menu:
         if self.menu_screens:
             self.menu_screens[self.menu_screen_idx].mode()
 
-    def update(self, entry: Any):
+    def update(self, msg: sensorbase.Message):
         if self.menu_screens:
             for s in self.menu_screens:
-                if s.options["name"] == entry.sensor.name:
-                    s.model = entry
+                if s.options["name"] == msg.sensor.name:
+                    s.model = msg
                     break
 
     def display(self):
         if self.backend and self.menu_screens:
-            self.backend.display(self.menu_screens[self.menu_screen_idx].frame().rotate(180))
+            self.backend.display(self.menu_screens[self.menu_screen_idx].frame())
 
     def exit(self):
         if self.backend and self.menu_screens:
             self.backend.display(self.menu_screens[self.menu_screen_idx].clear())
+            self.backend.disp.cleanup()  # FIXME
 
     def _select_backend(self):
         backend_type = self.options["backend"]["type"]
@@ -164,8 +163,8 @@ class Menu:
             return screen.SystemInfo(screen_options)
         elif name == "picam":
             return screen.PiCamera(screen_options)
-        #elif name == "webcam":
-        #    return screen.Webcam(screen_options)
+        elif name == "webcam":
+           return screen.Webcam(screen_options)
         elif name == "imu":
             return screen.Imu(screen_options)
         elif name == "gps":

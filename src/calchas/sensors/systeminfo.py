@@ -68,7 +68,7 @@ class SensorImpl:
     def read_system(self) -> Dict[str, Any]:
         cpu_times_percent = psutil.cpu_times_percent()
         loadavg = psutil.getloadavg()
-        state = {
+        return {
             "system_cpu_percent": psutil.cpu_percent(),
             "system_cpu_times_percent_system": cpu_times_percent.system,
             "system_cpu_times_percent_user": cpu_times_percent.user,
@@ -79,7 +79,6 @@ class SensorImpl:
             "system_loadavg_15": loadavg[2],
             "system_virtual_memory_percent": psutil.virtual_memory().percent,
         }
-        return state
 
     def read_process(self) -> Dict[str, Any]:
         with self.process.oneshot():
