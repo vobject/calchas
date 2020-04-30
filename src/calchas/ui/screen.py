@@ -138,7 +138,7 @@ class PiCamera(Base):
 
         # TODO: define what format the preview image is in
         #image = PIL.Image.open(io.BytesIO(self.model.data['preview']))
-        return self.model.data["preview"].resize((128, 64)).convert("1").rotate(180)
+        return self.model.data["preview"].resize((128, 64)).convert("1")
 
 
 class Imu(Base):

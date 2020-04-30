@@ -117,9 +117,9 @@ class Output(base.Subscriber):
     def on_process_message(self, msg: base.Message):
         self.data.append([
             msg.timestamp,
-            msg.data.longitude,
-            msg.data.latitude,
-            msg.data.altitude,
+            msg.data.longitude or 0.0,
+            msg.data.latitude or 0.0,
+            msg.data.altitude or 0.0,
         ])
 
         # Write data to disk every X entries

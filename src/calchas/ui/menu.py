@@ -91,7 +91,7 @@ class Menu:
                 "dry-run": False,
                 "port": 1,
                 "address": 0x3c,
-                "rotation": 2,  # 0==0°, 1==90°, 2==180°, 3==270° clockwise
+                "rotation": 0,  # 0==0°, 1==90°, 2==180°, 3==270° clockwise
                 "width": 128,
                 "height": 64,
             },
