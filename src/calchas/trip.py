@@ -10,6 +10,7 @@ from calchas import utils
 
 
 class Trip:
+    TRIP_OPTIONS_VERSION = "1.0.0"
     TRIP_OPTIONS_FILE = "trip_options.json"
 
     def __init__(self, parent_dir=".", mode="r", temporary=False, options: Dict[str, Any]=None, max_retries=999):
@@ -27,7 +28,7 @@ class Trip:
             self.parent_dir = os.path.basename(self.directory)
             with open(os.path.join(self.directory, Trip.TRIP_OPTIONS_FILE), "r") as f:
                 self.options = json.load(f)
-            logging.info(f"Trip directory opened: {self.directory}")
+            logging.debug(f"Trip directory opened: {self.directory}")
         elif self.mode == "w":
             dirs_tried = []
             while len(dirs_tried) <= self._max_retries:
@@ -55,6 +56,9 @@ class Trip:
 
     def default_options(self):
         return {
+            "trip": {
+                "version": Trip.TRIP_OPTIONS_VERSION,
+            },
             "systeminfo": {
                 "name": "systeminfo",
                 "active": False,
@@ -124,8 +128,12 @@ class TripManager:
     _re_match_iso8601 = re.compile(_trip_regex).match
 
     @staticmethod
+    def is_trip_name(path: str) -> bool:
+        return TripManager._re_match_iso8601(os.path.basename(path))
+
+    @staticmethod
     def is_trip_dir(path: str) -> bool:
-        return os.path.isdir(path) and TripManager._re_match_iso8601(os.path.basename(path))
+        return os.path.isdir(path) and TripManager.is_trip_name(os.path.basename(path))
 
     @staticmethod
     def list(parent_dir: str=".") -> List[str]:
