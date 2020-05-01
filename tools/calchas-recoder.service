@@ -1,15 +1,13 @@
 [Unit]
-Description = Calchas
+Description = Calchas Recorder
 Wants = network.target
 After = network.target
 
 [Service]
 Type = simple
-ExecStart = python3 /home/pi/git/calchas-git/src/app.py
+ExecStart = python3 /home/pi/git/calchas-git/bin/calchas-recorder.py /home/pi/git/calchas-git
 WorkingDirectory = /home/pi/git/calchas-git
 User = pi
-Restart=on-failure
-RestartSec=30s
 
 [Install]
 WantedBy = multi-user.target

@@ -46,7 +46,7 @@ class HealthMonitor(sensorbase.Subscriber):
 
         # TODO: find a better place for this...
         self.menu = menu.Menu()
-        for sensor_name, sensor_options in self.trip.options.items():
+        for sensor_name, sensor_options in self.trip.options.get("sensors", {}).items():
             if sensor_options.get("active", False):
                 self.menu.add_screen(sensor_name)
 
@@ -80,8 +80,8 @@ class HealthMonitor(sensorbase.Subscriber):
 
         self.menu.update(msg)
 
-        if msg.sensor.name == "systeminfo":
-           logging.info(pprint.pformat(msg.data, indent=4))
+        # if msg.sensor.name == "systeminfo":
+        #    logging.info(pprint.pformat(msg.data, indent=4))
 
     def on_signal(self, signal_number=0, stack_frame=None):
         logging.info(f"Signal received {signal_number}. Informing {len(self._shutdown_callbacks)} listeners.")

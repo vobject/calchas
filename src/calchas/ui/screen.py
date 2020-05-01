@@ -51,7 +51,6 @@ class SystemInfo(Base):
         self.clear()
         left, top, lineh = 0, -2, 8
 
-        logging.info(f"SystemInfo.frame(mode={self._mode})")
         w, _ = self.img.size
         header_w, _ = self.img_draw.textsize(self.options["header"])
         self.img_draw.text(((w - header_w) / 2, top), self.options["header"], font=self.font, fill=255)

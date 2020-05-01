@@ -57,10 +57,12 @@ if platform.system() == "Linux":
             self.bus = serial.i2c(port=self.options["port"], address=self.options["address"])
             self.disp = device.ssd1306(self.bus, rotate=self.options["rotation"])
 
-            self.button = gpiozero.Button(17)
-            self.button2 = gpiozero.Button(18)
-            self.button.when_pressed = menu.next
+            self.button = gpiozero.Button(17, bounce_time=.1)
+            self.button2 = gpiozero.Button(18, bounce_time=.1)
+            self.button3 = gpiozero.Button(27, bounce_time=.1)
+            self.button.when_pressed = menu.prev
             self.button2.when_pressed = menu.mode
+            self.button3.when_pressed = menu.next
 
         def display(self, img: Image):
             self.disp.display(img)
@@ -119,7 +121,7 @@ class Menu:
             screen = self._create_screen(screen, options)
         self.menu_screens.append(screen)
 
-    def previous(self):
+    def prev(self):
         if self.menu_screens:
             self.menu_screen_idx = (self.menu_screen_idx - 1) % len(self.menu_screens)
 

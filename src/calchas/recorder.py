@@ -37,8 +37,8 @@ class Recorder:
         logging.info("Data recording stopped")
 
     def _start_sensors(self):
-        for name, options in self.trip.options.items():
-            if options["active"]:
+        for name, options in self.trip.options.get("sensors", {}).items():
+            if options.get("active", False):
                 self.sensors.append(self._create_sensor_instance(name, options))
         for pub, sub in self.sensors:
             logging.info(f"Starting {pub.name}...")

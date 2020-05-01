@@ -84,6 +84,7 @@ class Sensor(base.Publisher):
             if self.request_stop:
                 return
 
+            # FIXME: when there's no GPS connected, this will block indefinitely
             for msg in batch:
                 if isinstance(msg, pynmea2.GGA):
                     # TODO: create classes for payload-types

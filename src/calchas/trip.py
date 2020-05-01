@@ -13,10 +13,10 @@ class Trip:
     TRIP_OPTIONS_VERSION = "1.0.0"
     TRIP_OPTIONS_FILE = "trip_options.json"
 
-    def __init__(self, parent_dir=".", mode="r", temporary=False, options: Dict[str, Any]=None, max_retries=999):
+    def __init__(self, parent_dir=".", mode="r", options: Dict[str, Any]=None, remove_on_exit=False, max_retries=999):
         self.parent_dir = parent_dir
         self.mode = mode
-        self.temporary = temporary
+        self.remove_on_exit = remove_on_exit
         self._max_retries = max_retries
 
         self.options = utils.dict_merge(self.default_options(), options)
@@ -50,7 +50,7 @@ class Trip:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.temporary:
+        if self.remove_on_exit:
             logging.info(f"Cleaning up trip directory: {self.directory}")
             shutil.rmtree(self.directory)
 
@@ -59,65 +59,67 @@ class Trip:
             "trip": {
                 "version": Trip.TRIP_OPTIONS_VERSION,
             },
-            "systeminfo": {
-                "name": "systeminfo",
-                "active": False,
-                "dry-run": False,
-                "frequency": 2,
-                "output": "systeminfo.csv",
-                "output_write_threshold": 20,
-            },
-            "picam": {
-                "name": "picam",
-                "active": False,
-                "dry-run": False,
-                "output_data": "picam.h264",
-                "output_metadata": "picam.csv",
-                "output_metadata_threshold": 300,
-                "width": 1920,
-                "height": 1080,
-                "rotation": 0,
-                "framerate": 10,
-                "format": "h264",
-                "quality": 25,
-                "init_sec": 1.,
-            },
-            "webcam": {
-                "name": "webcam",
-                "active": False,
-                "dry-run": False,
-                "device": 1,
-                "width": 1280,
-                "height": 720,
-                "rotation": 0,
-                "framerate": 10,
-                "format": "MJPG",  # uses a lot of cpu
-                # "format": "XVID",  # leaks memory like crazy
-                # "format": "mp4v",
-                "output_data": "webcam0.avi",
-                "output_metadata": "webcam0.csv",
-                "output_metadata_threshold": 300,
-            },
-            "imu": {
-                "name": "imu",
-                "active": False,
-                "dry-run": False,
-                "frequency": 5,
-                "output": "imu.csv",
-                "output_write_threshold": 200,
-                "i2c_bus": 1,
-                "address": 0x69,
-                "power_mgmt_1": 0x6b,
-            },
-            "gps": {
-                "name": "gps",
-                "active": False,
-                "dry-run": False,
-                "output": "gps.csv",
-                "output_write_threshold": 10,
-                "serial_dev": "/dev/ttyAMA0",
-                "serial_baudrate": 9600,
-                "serial_timeout": 1.,
+            "sensors": {
+                "systeminfo": {
+                    "name": "systeminfo",
+                    "active": False,
+                    "dry-run": False,
+                    "frequency": 2,
+                    "output": "systeminfo.csv",
+                    "output_write_threshold": 20,
+                },
+                "picam": {
+                    "name": "picam",
+                    "active": False,
+                    "dry-run": False,
+                    "output_data": "picam.h264",
+                    "output_metadata": "picam.csv",
+                    "output_metadata_threshold": 300,
+                    "width": 1920,
+                    "height": 1080,
+                    "rotation": 0,
+                    "framerate": 10,
+                    "format": "h264",
+                    "quality": 25,
+                    "init_sec": 1.,
+                },
+                "webcam": {
+                    "name": "webcam",
+                    "active": False,
+                    "dry-run": False,
+                    "device": 1,
+                    "width": 1280,
+                    "height": 720,
+                    "rotation": 0,
+                    "framerate": 10,
+                    "format": "MJPG",  # uses a lot of cpu
+                    # "format": "XVID",  # leaks memory like crazy
+                    # "format": "mp4v",
+                    "output_data": "webcam0.avi",
+                    "output_metadata": "webcam0.csv",
+                    "output_metadata_threshold": 300,
+                },
+                "imu": {
+                    "name": "imu",
+                    "active": False,
+                    "dry-run": False,
+                    "frequency": 5,
+                    "output": "imu.csv",
+                    "output_write_threshold": 200,
+                    "i2c_bus": 1,
+                    "address": 0x69,
+                    "power_mgmt_1": 0x6b,
+                },
+                "gps": {
+                    "name": "gps",
+                    "active": False,
+                    "dry-run": False,
+                    "output": "gps.csv",
+                    "output_write_threshold": 10,
+                    "serial_dev": "/dev/ttyAMA0",
+                    "serial_baudrate": 9600,
+                    "serial_timeout": 1.,
+                },
             },
         }
 
@@ -147,12 +149,12 @@ class TripManager:
             shutil.rmtree(td)
 
     @staticmethod
-    def new(parent_dir=".", temporary=False, options: Dict[str, Any]=None) -> Trip:
-        return Trip(parent_dir, mode="w", temporary=temporary, options=options)
+    def new(parent_dir=".", options: Dict[str, Any]=None, remove_on_exit=False) -> Trip:
+        return Trip(parent_dir, mode="w", options=options, remove_on_exit=remove_on_exit)
 
     @staticmethod
-    def append(trip_dir=".", temporary=False) -> Trip:
-        return Trip(trip_dir, mode="r", temporary=temporary)
+    def append(trip_dir=".", remove_on_exit=False) -> Trip:
+        return Trip(trip_dir, mode="r", remove_on_exit=remove_on_exit)
 
     @staticmethod
     def read(trip_dir=".") -> Trip:
