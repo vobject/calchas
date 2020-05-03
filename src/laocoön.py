@@ -25,7 +25,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-import seaborn as sns
+# import seaborn as sns
 
 import streamlit as st
 
@@ -191,6 +191,7 @@ def import_remote_trips(hostname: str, trip_dirs: List[str], out_dir: str, progr
             if os.path.isfile(picam_h264_path):
                 mp4_path = f"{picam_h264_path[:-4]}mp4"
                 ffmpeg_path = r"C:\Users\vobject\Tools\ffmpeg-4.2.1-win64-static\bin\ffmpeg.exe"
+                ffmpeg_path = r"C:\Users\user\Downloads\Python\ffmpeg-20200417-889ad93-win64-static\bin\ffmpeg.exe"
                 cmd = f"{ffmpeg_path} -framerate 10 -i {picam_h264_path} -c copy {mp4_path}"
                 logging.info(cmd)
                 subprocess.run(cmd)
@@ -276,5 +277,5 @@ if __name__ == "__main__":
 
 # import pdb;pdb.set_trace()
 
-# Import mode: streamlit run src/laocoön.py -- --trips=".." --remote=zpi:~/git/calchas-git -v
+# Import mode: streamlit run src/laocoön.py -- --trips=".." --remote=pi@zpi:~/git/calchas-git -v
 # Analyse mode: streamlit run src/laocoön.py -- --trips=".." -v

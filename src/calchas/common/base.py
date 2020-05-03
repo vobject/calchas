@@ -4,8 +4,6 @@ import threading
 import time
 from typing import Any, Dict, List
 
-from calchas import monitor
-
 
 class SensorBase:
     def __init__(self, options: Any):
@@ -67,7 +65,7 @@ class Subscriber:
         if self._run_message_thread:
             self._messages.put(msg)
 
-    def start(self) -> None:
+    def start(self) -> bool:
         try:
             self._start_impl()
 
@@ -75,10 +73,12 @@ class Subscriber:
             self._messages = queue.Queue()
             self._message_thread = threading.Thread(target=self._consume_message_thread_fn)
             self._message_thread.start()
+            return True
         except NotImplementedError:
             raise
         except Exception:
             logging.exception(f"Error starting {self.name}")
+            return False
 
     def stop(self) -> None:
         try:
@@ -150,13 +150,15 @@ class Publisher(SensorBase):
                     for s in subs:
                         s.on_message(Message(self, topic, payload))
 
-    def start(self) -> None:
+    def start(self) -> bool:
         try:
             self._start_impl()
+            return True
         except NotImplementedError:
             raise
         except Exception:
             logging.exception(f"Error starting {self.name}")
+            return False
 
     def stop(self) -> None:
         try:

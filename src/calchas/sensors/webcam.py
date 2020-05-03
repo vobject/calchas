@@ -8,8 +8,7 @@ from typing import Any, Dict, List
 
 import cv2
 
-from calchas import monitor
-from calchas.sensors import base
+from calchas.common import base
 
 import io
 from PIL import Image

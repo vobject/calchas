@@ -10,7 +10,7 @@ from typing import Any, Dict, List
 import picamera
 from PIL import Image
 
-from calchas.sensors import base
+from calchas.common import base
 
 
 class Sensor(base.Publisher):

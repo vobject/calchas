@@ -9,48 +9,62 @@ import sys
 import time
 from typing import Any, Callable, Dict, List, Tuple
 
-import gpiozero
-
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO)
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), os.pardir, "src")))
 
-from calchas import monitor, recorder, trip
+from calchas import recorder, trip
 
 
 class StartupFlags(enum.Enum):
     """GPIO pins are connected to dip switches and control how the program runs."""
-    RECORDER = gpiozero.Button(12, bounce_time=.1)
-    DISPLAY = gpiozero.Button(6, bounce_time=.1)
+    RECORDER = 12
+    DISPLAY = 6
 
-    SENSOR_SYSINFO = gpiozero.Button(13, bounce_time=.1)
-    SENSOR_PICAM = gpiozero.Button(19, bounce_time=.1)
-    SENSOR_WEBCAM = gpiozero.Button(16, bounce_time=.1)
-    SENSOR_IMU = gpiozero.Button(20, bounce_time=.1)
-    SENSOR_GPS = gpiozero.Button(26, bounce_time=.1)
+    SENSOR_SYSINFO = 13
+    SENSOR_PICAM = 19
+    SENSOR_WEBCAM = 16
+    SENSOR_IMU = 20
+    SENSOR_GPS = 26
 
-    UNUSED_21 = gpiozero.Button(21, bounce_time=.1)
+    UNUSED_21 = 21
+
+    def __init__(self, gpio_pin: int):
+        self.gpio_pin = gpio_pin
+        try:
+            import gpiozero
+            self.btn = gpiozero.Button(gpio_pin, bounce_time=.1)
+        except ImportError:
+            self.btn = None
 
     def is_active(self) -> bool:
-        return self.value.is_pressed
+        return self.btn.is_pressed if self.btn is not None else False
 
     @classmethod
     def log_state(cls):
         print("StartupFlags:")
         for f in StartupFlags:
-            print(f"    flag={f.name} pin={f.value.pin} active={f.value.is_pressed}")
+            if f.btn is not None:
+                print(f"    flag={f.name} pin={f.btn.pin} active={f.btn.is_pressed}")
+            else:
+                print(f"    flag={f.name} pin={f.gpio_pin} active=False")
 
 
 class ControlButtons(enum.Enum):
     """Button actions during runtime."""
-    STOP_CALCHAS = gpiozero.Button(25, hold_time=2.)
+    STOP_CALCHAS = 25
 
-    # MENU_PREV = gpiozero.Button(17, bounce_time=.1)
-    # MENU_NEXT = gpiozero.Button(27, bounce_time=.1)
-    # MENU_MODE = gpiozero.Button(18, bounce_time=.1)
+    def __init__(self, gpio_pin: int):
+        self.gpio_pin = gpio_pin
+        try:
+            import gpiozero
+            self.btn = gpiozero.Button(gpio_pin, hold_time=2.)
+        except ImportError:
+            self.btn = None
 
     def when_held(self, callback):
-        self.value.when_held = callback
+        if self.btn is not None:
+            self.btn.when_held = callback
 
 
 def parse_args():
@@ -59,12 +73,17 @@ def parse_args():
     parser.add_argument("trips_dir", help="The directory to save recorded trip data.")
     parser.add_argument("-f", "--force", action="store_true", help="Ignore the recorder startup pin.")
     parser.add_argument("-n", "--temporary", action="store_true", help="Remove the trip directory when exiting.")
+    parser.add_argument("--display", action="store_true", help="Ignore the recorder startup pin and enable the display.")
+    parser.add_argument("--systeminfo", action="store_true", help="Ignore the recorder startup pin and start systeminfo sensor.")
+    parser.add_argument("--picam", action="store_true", help="Ignore the recorder startup pin and start picam sensor.")
+    parser.add_argument("--webcam", action="store_true", help="Ignore the recorder startup pin and start webcam sensor.")
+    parser.add_argument("--imu", action="store_true", help="Ignore the recorder startup pin and start imu sensor.")
+    parser.add_argument("--gps", action="store_true", help="Ignore the recorder startup pin and start gps sensor.")
 
     return parser.parse_args()
 
 
 def main() -> int:
-    # TODO: Allow overriding StartupFlags with commandline arguments.
     args = parse_args()
 
     if not args.force and not StartupFlags.RECORDER.is_active():
@@ -74,16 +93,26 @@ def main() -> int:
     logging.info("Starting program")
     StartupFlags.log_state()
 
+    # Override a trip's default options.
     trip_options = {
+        "monitors": {
+            "healthmon": {
+                "active": True,
+            },
+            "display": {
+                "active": args.display or StartupFlags.DISPLAY.is_active(),
+                "screens": [],
+            },
+        },
         "sensors": {
             "systeminfo": {
-                "active": StartupFlags.SENSOR_SYSINFO.is_active(),
+                "active": args.systeminfo or StartupFlags.SENSOR_SYSINFO.is_active(),
             },
             "picam": {
-                "active": StartupFlags.SENSOR_PICAM.is_active(),
+                "active": args.picam or StartupFlags.SENSOR_PICAM.is_active(),
             },
             "webcam": {
-                "active": StartupFlags.SENSOR_WEBCAM.is_active(),
+                "active": args.webcam or StartupFlags.SENSOR_WEBCAM.is_active(),
                 "dry-run": False,
                 "device": 0,
                 "format": "mp4v",
@@ -91,26 +120,35 @@ def main() -> int:
                 "height": 480,
             },
             "imu": {
-                "active": StartupFlags.SENSOR_IMU.is_active(),
+                "active": args.imu or StartupFlags.SENSOR_IMU.is_active(),
             },
             "gps": {
-                "active": StartupFlags.SENSOR_GPS.is_active(),
+                "active": args.gps or StartupFlags.SENSOR_GPS.is_active(),
                 "serial_dev": "COM4" if platform.system() == "Windows" else "/dev/ttyAMA0",
             },
         },
     }
 
+    # Activate display screens for active sensors.
+    def activate_screen(options, sensor: str):
+        if options["sensors"][sensor]["active"] is True:
+            options["monitors"]["display"]["screens"].append(sensor)
+    activate_screen(trip_options, "systeminfo")
+    activate_screen(trip_options, "picam")
+    # activate_screen(trip_options, "webcam")  # FIXME: add webcam screen
+    activate_screen(trip_options, "imu")
+    activate_screen(trip_options, "gps")
+
     try:
-        with trip.TripManager.new(args.trips_dir, trip_options, remove_on_exit=args.temporary) as new_trip:
-            with monitor.HealthMonitor(new_trip) as new_monitor:
-                # with vis.Menu(new_trip, new_monitor, ControlButtons.MENU_PREV, ControlButtons.MENU_NEXT, ControlButtons.MENU_MODE) as ui:
-                rec = recorder.Recorder(new_trip, new_monitor)
+        with trip.TripManager.new(args.trips_dir, trip_options, args.temporary) as new_trip:
+            rec = recorder.Recorder(new_trip)
 
-                ControlButtons.STOP_CALCHAS.when_held(lambda: rec.stop())
+            # TODO: add this to healthmon internal handling
+            ControlButtons.STOP_CALCHAS.when_held(lambda: rec.stop())
 
-                rec.start()
-                while rec.running:
-                    time.sleep(1.)
+            rec.start()
+            while rec.running:
+                time.sleep(1.)
         rc = 0
     except Exception:
         logging.exception("Something went wrong")

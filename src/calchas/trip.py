@@ -59,6 +59,32 @@ class Trip:
             "trip": {
                 "version": Trip.TRIP_OPTIONS_VERSION,
             },
+            "monitors": {
+                "healthmon": {
+                    "name": "healthmon",
+                    "active": False,
+                    "dry-run": False,
+                    "frequency": 1,  # Check system health once per second
+                    "disk_usage_threshold": 95.0,  # Shut down when <5% disk space is available
+                    "temperature_threshold": 80.0,  # Shut down when temperature is too high
+                    # TODO: monitor under-voltage: https://raspberrypi.stackexchange.com/questions/60593/how-raspbian-detects-under-voltage
+                },
+                "display": {
+                    "name": "sdd1306",
+                    "active": False,
+                    "dry-run": False,
+                    "port": 1,
+                    "address": 0x3c,
+                    "rotation": 0,  # 0==0°, 1==90°, 2==180°, 3==270° clockwise
+                    "width": 128,
+                    "height": 64,
+                    "framerate": 1,
+                    "gpio_pin_prev": 17,
+                    "gpio_pin_next": 27,
+                    "gpio_pin_mode": 18,
+                    "screens": [],
+                },
+            },
             "sensors": {
                 "systeminfo": {
                     "name": "systeminfo",
@@ -87,13 +113,13 @@ class Trip:
                     "name": "webcam",
                     "active": False,
                     "dry-run": False,
-                    "device": 1,
+                    "device": 1,  # device used for cv2.VideoCapture()
                     "width": 1280,
                     "height": 720,
                     "rotation": 0,
                     "framerate": 10,
-                    "format": "MJPG",  # uses a lot of cpu
-                    # "format": "XVID",  # leaks memory like crazy
+                    "format": "MJPG",  # uses a lot of cpu (on RasPi)
+                    # "format": "XVID",  # leaks memory like crazy (on RasPi)
                     # "format": "mp4v",
                     "output_data": "webcam0.avi",
                     "output_metadata": "webcam0.csv",

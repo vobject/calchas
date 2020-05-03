@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Union
 from PIL import Image, ImageDraw, ImageFont
 
 from calchas import utils
-from calchas.sensors import base as sensorbase
+from calchas.common import base
 from calchas.ui import screen
 
 
@@ -57,9 +57,9 @@ if platform.system() == "Linux":
             self.bus = serial.i2c(port=self.options["port"], address=self.options["address"])
             self.disp = device.ssd1306(self.bus, rotate=self.options["rotation"])
 
-            self.button = gpiozero.Button(17, bounce_time=.1)
-            self.button2 = gpiozero.Button(18, bounce_time=.1)
-            self.button3 = gpiozero.Button(27, bounce_time=.1)
+            self.button = gpiozero.Button(self.options["gpio_pin_prev"], bounce_time=.1)
+            self.button2 = gpiozero.Button(self.options["gpio_pin_mode"], bounce_time=.1)
+            self.button3 = gpiozero.Button(self.options["gpio_pin_next"], bounce_time=.1)
             self.button.when_pressed = menu.prev
             self.button2.when_pressed = menu.mode
             self.button3.when_pressed = menu.next
@@ -70,7 +70,7 @@ else:
     # TODO: portable backend or better fallback
     class _Oled:
         def __init__(self, options: Dict[str, Any], menu):
-            pass
+            self.disp = None
 
         def display(self, img: Image):
             pass
@@ -133,7 +133,7 @@ class Menu:
         if self.menu_screens:
             self.menu_screens[self.menu_screen_idx].mode()
 
-    def update(self, msg: sensorbase.Message):
+    def update(self, msg: base.Message):
         if self.menu_screens:
             for s in self.menu_screens:
                 if s.options["name"] == msg.sensor.name:
@@ -147,7 +147,8 @@ class Menu:
     def exit(self):
         if self.backend and self.menu_screens:
             self.backend.display(self.menu_screens[self.menu_screen_idx].clear())
-            self.backend.disp.cleanup()  # FIXME
+            if self.backend.disp:  # FIXME
+                self.backend.disp.cleanup()  # FIXME
 
     def _select_backend(self):
         backend_type = self.options["backend"]["type"]

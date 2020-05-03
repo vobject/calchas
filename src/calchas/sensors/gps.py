@@ -9,7 +9,7 @@ from typing import Any, Dict, List
 import pynmea2
 import serial
 
-from calchas.sensors import base
+from calchas.common import base
 
 
 class NMEAByteStream:
