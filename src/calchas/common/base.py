@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 
 class SensorBase:
     def __init__(self, options: Any):
-        self._options = options
+        self._options = options or {}
 
     @property
     def options(self):
@@ -37,7 +37,7 @@ class Message:
 class Subscriber:
     def __init__(self, options: Any):
         super().__init__()
-        self._options = options
+        self._options = options or {}
         self._messages = None
         self._message_thread = None
         self._run_message_thread = False

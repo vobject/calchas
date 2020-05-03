@@ -99,7 +99,7 @@ def main() -> int:
             "healthmon": {
                 "active": True,
             },
-            "display": {
+            "sdd1306": {
                 "active": args.display or StartupFlags.DISPLAY.is_active(),
                 "screens": [],
             },
@@ -132,10 +132,10 @@ def main() -> int:
     # Activate display screens for active sensors.
     def activate_screen(options, sensor: str):
         if options["sensors"][sensor]["active"] is True:
-            options["monitors"]["display"]["screens"].append(sensor)
+            options["monitors"]["sdd1306"]["screens"].append(sensor)
     activate_screen(trip_options, "systeminfo")
     activate_screen(trip_options, "picam")
-    # activate_screen(trip_options, "webcam")  # FIXME: add webcam screen
+    activate_screen(trip_options, "webcam")
     activate_screen(trip_options, "imu")
     activate_screen(trip_options, "gps")
 

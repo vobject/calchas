@@ -1,6 +1,5 @@
 import datetime
 import logging
-import pprint
 import queue
 import shutil
 import signal
@@ -22,9 +21,6 @@ class Monitor(base.Subscriber):
 
     def on_process_message(self, msg: base.Message):
         logging.debug(f"Monitor msg from {msg.sensor.name}")
-
-        # if msg.sensor.name == "systeminfo":
-        #    logging.info(pprint.pformat(msg.data, indent=4))
 
     def on_signal(self, signal_number=0, stack_frame=None):
         logging.info(f"Signal received {signal_number}. Informing {len(self._shutdown_callbacks)} listeners.")
@@ -56,6 +52,16 @@ class Monitor(base.Subscriber):
             self._health_check_thread.join()
             self._health_check_thread = None
 
+        # FIXME: when shutting down via GPIO Button
+        # ERROR: Error stopping healthmon
+        # Traceback (most recent call last):
+        #   File "src/calchas/common/base.py", line 91, in stop
+        #     self._stop_impl()
+        #   File "src/calchas/monitors/healthmon.py", line 59, in _stop_impl
+        #     signal.signal(signal.SIGINT, self._orig_handler_sigint)
+        #   File "/usr/lib/python3.7/signal.py", line 47, in signal
+        #     handler = _signal.signal(_enum_to_int(signalnum), _enum_to_int(handler))
+        # ValueError: signal only works in main thread
         signal.signal(signal.SIGINT, self._orig_handler_sigint)
         signal.signal(signal.SIGTERM, self._orig_handler_sigterm)
 

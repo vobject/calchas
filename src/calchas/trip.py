@@ -69,7 +69,7 @@ class Trip:
                     "temperature_threshold": 80.0,  # Shut down when temperature is too high
                     # TODO: monitor under-voltage: https://raspberrypi.stackexchange.com/questions/60593/how-raspbian-detects-under-voltage
                 },
-                "display": {
+                "sdd1306": {
                     "name": "sdd1306",
                     "active": False,
                     "dry-run": False,
@@ -103,7 +103,7 @@ class Trip:
                     "output_metadata_threshold": 300,
                     "width": 1920,
                     "height": 1080,
-                    "rotation": 0,
+                    "rotation": 180,
                     "framerate": 10,
                     "format": "h264",
                     "quality": 25,
