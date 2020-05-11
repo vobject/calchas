@@ -102,28 +102,31 @@ def run(trip_path: str):
         # GPS
         csv_path = os.path.join(trip_path, "gps.csv")
         if os.path.isfile(csv_path):
-            df = pd.read_csv(csv_path, index_col="timestamp", converters={"timestamp": to_datetime})
-            df = df.replace(0, np.nan)
-            df = df.dropna(how='all', axis=0)
-            # with open(csv_path) as f:
-            #     r = csv.DictReader(f, delimiter=",")
-            #     for entry in r:
-            #         lon = entry["longitude"]
-            #         lat = entry["latitude"]
-            #         alt = entry["altitude"]
-            #         if lon in ("", "0.0", "0"): continue
-            #         if lat in ("", "0.0", "0"): continue
-            #         if alt in ("", "0.0", "0"): continue
-            #         kml_pos_list.append(f"{lon},{lat},{alt}")
+            try:
+                df = pd.read_csv(csv_path, index_col="timestamp", converters={"timestamp": to_datetime})
+                df = df.replace(0, np.nan)
+                df = df.dropna(how='all', axis=0)
 
-            st.markdown("## GPS")
-            st.dataframe(df)
-            st.write(len(df))
-            st.map(df)
+                # with open(csv_path) as f:
+                #     r = csv.DictReader(f, delimiter=",")
+                #     for entry in r:
+                #         lon = entry["longitude"]
+                #         lat = entry["latitude"]
+                #         alt = entry["altitude"]
+                #         if lon in ("", "0.0", "0"): continue
+                #         if lat in ("", "0.0", "0"): continue
+                #         if alt in ("", "0.0", "0"): continue
+                #         kml_pos_list.append(f"{lon},{lat},{alt}")
+
+                st.markdown("## GPS")
+                st.dataframe(df)
+                st.write(len(df))
+                st.map(df)
+            except pd.errors.EmptyDataError:
+                logging.warning("Empty GPS file.")
 
         # PICAM
         mp4_path = os.path.join(trip_path, "picam.mp4")
-        # mp4_path = os.path.join(trip_path, os.pardir, "calchas-git", "download.mp4")
         if os.path.isfile(mp4_path):
             st.markdown("## PICAM")
 
@@ -192,8 +195,8 @@ def import_remote_trips(hostname: str, trip_dirs: List[str], out_dir: str, progr
             if os.path.isfile(picam_h264_path):
                 mp4_path = f"{picam_h264_path[:-4]}mp4"
                 ffmpeg_path = r"C:\Users\vobject\Tools\ffmpeg-4.2.1-win64-static\bin\ffmpeg.exe"
-                ffmpeg_path = r"C:\Users\user\Downloads\Python\ffmpeg-20200417-889ad93-win64-static\bin\ffmpeg.exe"
-                cmd = f"{ffmpeg_path} -framerate 10 -i {picam_h264_path} -c copy {mp4_path}"
+                # ffmpeg_path = r"C:\Users\user\Downloads\Python\ffmpeg-20200417-889ad93-win64-static\bin\ffmpeg.exe"
+                cmd = f"{ffmpeg_path} -framerate 10 -i {picam_h264_path} -c copy {mp4_path} -y"
                 logging.info(cmd)
                 subprocess.run(cmd)
 
@@ -211,7 +214,11 @@ def clear_remote_trips(hostname: str, trip_dirs: List[str], progress_bar):
 
 
 def run_import(args):
-    hostname, remote_trips_dir = args.remote.split(":")
+    if args.remote:
+        hostname, remote_trips_dir = args.remote.split(":")
+    else:
+        hostname, remote_trips_dir = "pi@zpi", "~/git/calchas-git"
+
     trip_dirs = get_remote_trip_dirs(hostname, remote_trips_dir)
 
     for td in trip_dirs:
@@ -266,8 +273,17 @@ def main():
     args = parse_args()
     os.makedirs(args.trips, exist_ok=True)
 
+    # if args.remote:
+    #     run_import(args)
+    # else:
+    #     run_local(args)
+
     if args.remote:
-        run_import(args)
+        mode = st.sidebar.radio("Mode", ["Analyze", "Import"], index=0)
+        if mode == "Analyze":
+            run_local(args)
+        elif mode == "Import":
+            run_import(args)
     else:
         run_local(args)
 
