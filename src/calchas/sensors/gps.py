@@ -47,6 +47,13 @@ class NMEAByteStreamReader(pynmea2.NMEAStreamReader):
         super().__init__(NMEAByteStream(stream), errors)
 
 
+NEO_GPS_SAMPLE_RATE_CONFIGS = {
+    "1Hz": [0xB5,0x62,0x06,0x08,0x06,0x00,0xE8,0x03,0x01,0x00,0x01,0x00,0x01,0x39,],
+    "5Hz": [0xB5,0x62,0x06,0x08,0x06,0x00,0xC8,0x00,0x01,0x00,0x01,0x00,0xDE,0x6A,],
+    "10Hz": [0xB5,0x62,0x06,0x08,0x06,0x00,0x64,0x00,0x01,0x00,0x01,0x00,0x7A,0x12,],
+}
+
+
 class Sensor(base.Publisher):
     def __init__(self, options: Dict[str, Any]):
         super().__init__(options)
@@ -62,6 +69,9 @@ class Sensor(base.Publisher):
     def _start_impl(self):
         if not self.serial:
             self.serial = serial.Serial(self.options["serial_dev"], baudrate=self.options["serial_baudrate"], timeout=self.options["serial_timeout"])
+
+            # TODO: make this configurable through trip options.
+            self.serial.write(bytes(NEO_GPS_SAMPLE_RATE_CONFIGS["5Hz"]))
 
         self.request_stop = False
         if not self.read_thread:

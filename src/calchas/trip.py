@@ -141,7 +141,7 @@ class Trip:
                     "active": False,
                     "dry-run": False,
                     "output": "gps.csv",
-                    "output_write_threshold": 10,
+                    "output_write_threshold": 100,
                     "serial_dev": "/dev/ttyAMA0",
                     "serial_baudrate": 9600,
                     "serial_timeout": 1.,
