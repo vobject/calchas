@@ -19,6 +19,7 @@ from typing import Any, Callable, Dict, List, Tuple
 # logging = logger
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO)
 
+import pyproj
 import fabric
 import pandas as pd
 import numpy as np
@@ -118,9 +119,23 @@ def run(trip_path: str):
                 #         if alt in ("", "0.0", "0"): continue
                 #         kml_pos_list.append(f"{lon},{lat},{alt}")
 
+                geod = pyproj.Geod(ellps="WGS84")
+                coords = [(idx, row["longitude"], row["latitude"]) for idx, row in df.iterrows()]
+                dists = [0,]
+                speeds = [0,]
+                for cur, nxt in zip(coords, coords[1:]):
+                    _, _, dist = geod.inv(cur[1], cur[2], nxt[1], nxt[2])
+                    dists.append(dist)
+                    td = nxt[0] - cur[0]
+                    speed = dist / (td.microseconds / 1000 / 3600)
+                    speeds.append(speed)
+
+                df["Distance"] = dists
+                df["km/h"] = speeds
+
                 st.markdown("## GPS")
                 st.dataframe(df)
-                st.write(len(df))
+                st.write(f"points={len(df)} distance={sum(dists) / 1000.:.3f}km avg_speed={sum(speeds) / len(speeds):.2f}km/h")
                 st.map(df)
             except pd.errors.EmptyDataError:
                 logging.warning("Empty GPS file.")
@@ -232,13 +247,16 @@ def run_import(args):
 
 
 def run_local(args):
+    def to_select_item(trip_dir: str):
+        return datetime.datetime.strptime(os.path.basename(trip_dir), "%Y%m%dT%H%M%SZ")
     trip_dirs = trip.TripManager.list(args.trips)
-    trip_name = st.sidebar.selectbox("Choose a trip", ["-"] + [os.path.basename(td) for td in trip_dirs], 0)
+    trip_items = [to_select_item(td) for td in trip_dirs]
+    trip_name = st.sidebar.selectbox("Choose a trip", ["-"] + trip_items, 0)
 
     if trip_name == "-":
         st.write("# Choose a trip")
         for td in trip_dirs:
-            st.write(td)
+            st.write(to_select_item(td))
         st.sidebar.success("Select a trip above.")
 
         # st.write(os.getcwd())
@@ -248,7 +266,7 @@ def run_local(args):
         # st.video(open(mp4_path, 'rb'))
         # st.video("https://www.youtube.com/watch?v=rq5FReMzBFc")
     else:
-        run(os.path.join(args.trips, trip_name))
+        run(os.path.join(args.trips, trip_dirs[trip_items.index(trip_name)]))
 
 
 def parse_args():
