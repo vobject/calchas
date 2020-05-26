@@ -108,35 +108,36 @@ def run(trip_path: str):
                 df = df.replace(0, np.nan)
                 df = df.dropna(how='all', axis=0)
 
-                # with open(csv_path) as f:
-                #     r = csv.DictReader(f, delimiter=",")
-                #     for entry in r:
-                #         lon = entry["longitude"]
-                #         lat = entry["latitude"]
-                #         alt = entry["altitude"]
-                #         if lon in ("", "0.0", "0"): continue
-                #         if lat in ("", "0.0", "0"): continue
-                #         if alt in ("", "0.0", "0"): continue
-                #         kml_pos_list.append(f"{lon},{lat},{alt}")
+                if not df.empty:
+                    # with open(csv_path) as f:
+                    #     r = csv.DictReader(f, delimiter=",")
+                    #     for entry in r:
+                    #         lon = entry["longitude"]
+                    #         lat = entry["latitude"]
+                    #         alt = entry["altitude"]
+                    #         if lon in ("", "0.0", "0"): continue
+                    #         if lat in ("", "0.0", "0"): continue
+                    #         if alt in ("", "0.0", "0"): continue
+                    #         kml_pos_list.append(f"{lon},{lat},{alt}")
 
-                geod = pyproj.Geod(ellps="WGS84")
-                coords = [(idx, row["longitude"], row["latitude"]) for idx, row in df.iterrows()]
-                dists = [0,]
-                speeds = [0,]
-                for cur, nxt in zip(coords, coords[1:]):
-                    _, _, dist = geod.inv(cur[1], cur[2], nxt[1], nxt[2])
-                    dists.append(dist)
-                    td = nxt[0] - cur[0]
-                    speed = dist / (td.microseconds / 1000 / 3600)
-                    speeds.append(speed)
+                    geod = pyproj.Geod(ellps="WGS84")
+                    coords = [(idx, row["longitude"], row["latitude"]) for idx, row in df.iterrows()]
+                    dists = [0,]
+                    speeds = [0,]
+                    for cur, nxt in zip(coords, coords[1:]):
+                        td = nxt[0] - cur[0]
+                        dist = geod.line_length([cur[1], nxt[1]], [cur[2], nxt[2]])
+                        speed = dist / (td.microseconds / 1000 / 3600)
+                        dists.append(dist)
+                        speeds.append(speed)
 
-                df["Distance"] = dists
-                df["km/h"] = speeds
+                    df["Distance"] = dists
+                    df["km/h"] = speeds
 
-                st.markdown("## GPS")
-                st.dataframe(df)
-                st.write(f"points={len(df)} distance={sum(dists) / 1000.:.3f}km avg_speed={sum(speeds) / len(speeds):.2f}km/h")
-                st.map(df)
+                    st.markdown("## GPS")
+                    st.dataframe(df)
+                    st.write(f"points={len(df)} distance={sum(dists) / 1000.:.3f}km avg_speed={sum(speeds) / len(speeds):.2f}km/h")
+                    st.map(df)
             except pd.errors.EmptyDataError:
                 logging.warning("Empty GPS file.")
 
