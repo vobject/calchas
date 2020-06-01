@@ -17,7 +17,7 @@ Each sensor collects timestamped data. The system clock is synchronized to the R
 | 3 | NEO-7M Mini GPS       | With external antenna | UART (GPIO PIN 14, 15) |  |
 | 4 | DS1307 RTC        | Consistent timestamps without NTP sync or after power cut | I2C (GPIO PIN 2, 3) | `dtoverlay=i2c-rtc,ds1307` |
 | 5 | GY-521 MPU6050        | 3-Axis Acceleration Gyroscope 6DOF; AD0 PIN set to high changes default address 0x68 to 0x69 | I2C (GPIO PIN 2, 3) 0x69 |  |
-| 6 | SDD1306 OLED          | 0.96" 128x64 Monochrome   | I2C (GPIO PIN 2, 3) 0x3c | `dtparam=i2c_arm=on,| Marker i2c_arm_baudrate=400000` |
+| 6 | SDD1306 OLED          | 0.96" 128x64 Monochrome   | I2C (GPIO PIN 2, 3) 0x3c | `dtparam=i2c_arm=on,i2c_arm_baudrate=400000` |
 | 7 | OLED Menu | Switch to previous (left) / next (right) menu screen and toggle screen mode (middle) | GPIO PIN 17, 27, 18 |  |
 | 8 | Dip Switches | 8 switches to control the program | GPIO PIN 6, 12, 13, 16, 19, 20, 21, 26 |  |
 | 9 | Stop Recording | Hold 2sec to stop recording | GPIO PIN 25 |  |
