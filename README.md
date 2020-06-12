@@ -68,4 +68,7 @@ gps.csv: `timestamp,longitude,latitude,altitude`
 
 ## Analysis
 
+
+![Analyzer Demo](images/demo_2.gif "Analysis")
+
 TODO
